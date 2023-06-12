@@ -1,0 +1,153 @@
+trigger 
+
+trigger AccountActivationTrigger on Account (before insert, before update, after insert, after update) {
+    if (Trigger.isBefore) {
+              List<Account> accountsToUpdate = new List<Account>();
+        for (Account account : Trigger.new) {
+           // system.debug('test'+account.RecordType.name);
+            if (account.Active__c &&  account.type == 'Customer' && String.isBlank(account.Account_Activation_Summary__c)) {
+                account.Id.addError('Account Activation Summary is required.');
+            } 
+        }
+        
+    }
+    else if (Trigger.isAfter) {
+        Set<Id> accountIds = new Set<Id>();
+        for (Account account : Trigger.new) {
+            accountIds.add(account.Id);
+        }
+
+      
+      
+        if (Trigger.isInsert || Trigger.isUpdate) {
+            List<Contact> existingContacts = [SELECT AccountId,Account.name FROM Contact WHERE AccountId IN :accountIds];
+            Set<Id> accountsWithContactIds = new Set<Id>();
+            for (Contact contact : existingContacts) {
+                accountsWithContactIds.add(contact.AccountId);
+            }
+
+            List<Contact> contactsToInsert = new List<Contact>();
+            for (Account account : Trigger.new) {
+                if (!accountsWithContactIds.contains(account.Id)) {
+                    Contact newContact = new Contact();
+                    newContact.AccountId = account.Id;
+                    newContact.FirstName = account.name;
+                    newContact.LastName = 'Customer Representative';
+                     newContact.Email = account.Company_Email__c;
+                     newContact.Phone = account.Phone;
+                    contactsToInsert.add(newContact);
+                }
+            }
+
+            if (!contactsToInsert.isEmpty()) {
+                insert contactsToInsert;
+            }
+        }
+        }
+    }
+	
+
+
+test classes
+
+
+@isTest
+public class AccountActivationTriggerTest {
+    @isTest
+    static void testBeforeInsertTrigger() {
+      //  RecordType recordType = [SELECT Id FROM RecordType WHERE SObjectType = 'Account' AND Name = 'Customer' LIMIT 1];
+
+        Account account = new Account();
+        account.Name = 'Test Account';
+        account.type = 'Prospect';
+        account.Active__c = true;
+        account.Company_Email__c = 'test@gmail.com';
+        account.Account_Activation_Summary__c = 'test';
+
+        Test.startTest();
+        insert account;
+        Test.stopTest();
+
+        // Perform assertions to verify the behavior of the trigger
+        account = [SELECT Id, Account_Activation_Summary__c FROM Account WHERE Id = :account.Id];
+           }
+
+    @isTest
+    static void testAfterInsertTrigger() {
+        Account account = new Account();
+        account.Name = 'Test Account';
+        account.Company_Email__c = 'test@example.com';
+        account.Phone = '1234567890';
+
+        Test.startTest();
+        insert account;
+        Test.stopTest();
+
+        // Perform assertions to verify the behavior of the trigger
+             
+    }
+}
+
+
+for creating components through ui
+
+html 
+
+<template>
+  <lightning-card title="Account Activation">
+    <div class="slds-m-around_medium">
+      <lightning-record-form
+        object-api-name="Account"
+        record-id={recordId}
+        fields={fields}
+        mode="edit"
+        onsubmit={handleActivate}
+        onerror={handleError}
+      ></lightning-record-form>
+    </div>
+  </lightning-card>
+</template>
+
+
+
+
+jss
+
+
+import { LightningElement, api } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+export default class AccountActivation extends LightningElement {
+  @api recordId;
+  fields = ['Active__c', 'Account_Activation_Summary__c','Type'];
+
+  handleActivate(event) {
+    event.preventDefault();
+
+    const fields = event.detail.fields;
+
+    if (fields.Active__c && !fields.Account_Activation_Summary__c && fields.Type === 'Customer'&& fields.Type !== null) {
+      this.showToast('Error', 'Account Activation Summary is required.', 'error');
+      return;
+    }
+
+    // Check user's permission set here (implementation not included)
+
+    // Continue with account activation logic
+    this.template.querySelector('lightning-record-form').submit(fields);
+  }
+
+  handleError(event) {
+    const error = event.detail;
+    this.showToast('Error', error.body.message, 'error');
+  }
+
+  showToast(title, message, variant) {
+    const toastEvent = new ShowToastEvent({
+      title: title,
+      message: message,
+      variant: variant,
+    });
+    this.dispatchEvent(toastEvent);
+  }
+}
