@@ -68,7 +68,7 @@ public class AccountActivationTriggerTest {
         insert account;
         Test.stopTest();
 
-        // Perform assertions to verify the behavior of the trigger
+       
         account = [SELECT Id, Account_Activation_Summary__c FROM Account WHERE Id = :account.Id];
            }
 
@@ -83,7 +83,7 @@ public class AccountActivationTriggerTest {
         insert account;
         Test.stopTest();
 
-        // Perform assertions to verify the behavior of the trigger
+        
              
     }
 }
@@ -131,9 +131,7 @@ export default class AccountActivation extends LightningElement {
       return;
     }
 
-    // Check user's permission set here (implementation not included)
-
-    // Continue with account activation logic
+   
     this.template.querySelector('lightning-record-form').submit(fields);
   }
 
